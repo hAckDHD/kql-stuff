@@ -2,17 +2,17 @@ let GetOffset = (dt: datetime) {
     let yr = getyear(dt);
     let marchFirst = make_datetime(yr,3,1);
     let novFirst = make_datetime(yr,11,1);
-    let marchFirstDow = toint(dayofweek(marchFirst) / 1d);   // 0=Sun ... 6=Sat
+    let marchFirstDow = toint(dayofweek(marchFirst) / 1d);
     let novFirstDow   = toint(dayofweek(novFirst) / 1d);
-    // 2nd Sunday in March
     let marchStart = datetime_add('day', toint(13 - marchFirstDow), marchFirst);
-    // 1st Sunday in November
     let novStart = datetime_add('day', toint(6 - novFirstDow), novFirst);
     case(
         dt >= marchStart and dt < novStart, -5h,  // CDT
         -6h                                       // CST
     )
 };
+//
+let TodayLocal = startofday(now() + GetOffset(now()));
 //
 AlertInfo
 | extend Offset = GetOffset(Timestamp)
@@ -22,14 +22,21 @@ AlertInfo
     hourofday(LocalTime) < 16.5, "1st Shift (0800-1630)",
     "2nd Shift (1630-0000)"
   )
+| extend ReportSection = case(
+    Status =~ "Resolved" and startofday(LocalTime) == TodayLocal, "1 - Resolved (Today)",
+    Status =~ "InProgress", "2 - In Progress",
+    Status =~ "New", "3 - Active (Untouched)",
+    "0 - Other"
+  )
+| where ReportSection != "0 - Other"
 | project
+    ReportSection,
     TimeGenerated = LocalTime,
     AlertId,
+    Status,
     Title,
-    Severity,
-    Status = "Active",
     AssignedTo = "",
     LastUpdate = LocalTime,
     Shift,
     Notes = ""
-| order by TimeGenerated desc
+| order by ReportSection asc, TimeGenerated desc
