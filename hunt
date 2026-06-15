@@ -1,0 +1,35 @@
+let IOCs = dynamic(["1.2.3.4", "evil-domain.com"]); // add IPs, domains, etc.
+union
+(
+    DeviceNetworkEvents
+    | where RemoteIP in (IOCs) or RemoteUrl has_any (IOCs)
+    | project Timestamp, DeviceId, DeviceName, ActionType, RemoteIP, RemoteUrl, RemotePort,
+        InitiatingProcessFileName, InitiatingProcessFolderPath, InitiatingProcessCommandLine,
+        InitiatingProcessAccountName, ReportId
+    | extend SourceTable = "DeviceNetworkEvents"
+),
+(
+    DeviceEvents
+    | where RemoteIP in (IOCs) or RemoteUrl has_any (IOCs)
+    | project Timestamp, DeviceId, DeviceName, ActionType, RemoteIP, RemoteUrl, RemotePort=int(null),
+        InitiatingProcessFileName, InitiatingProcessFolderPath, InitiatingProcessCommandLine,
+        InitiatingProcessAccountName, ReportId
+    | extend SourceTable = "DeviceEvents"
+),
+(
+    EmailUrlInfo
+    | where Url has_any (IOCs)
+    | project Timestamp, DeviceId=NetworkMessageId, DeviceName="", ActionType="EmailUrl", RemoteIP="", RemoteUrl=Url, RemotePort=int(null),
+        InitiatingProcessFileName="", InitiatingProcessFolderPath="", InitiatingProcessCommandLine="",
+        InitiatingProcessAccountName="", ReportId=""
+    | extend SourceTable = "EmailUrlInfo"
+),
+(
+    EmailEvents
+    | where SenderIPv4 in (IOCs)
+    | project Timestamp, DeviceId=NetworkMessageId, DeviceName="", ActionType="EmailEvent", RemoteIP=SenderIPv4, RemoteUrl=SenderFromDomain, RemotePort=int(null),
+        InitiatingProcessFileName="", InitiatingProcessFolderPath="", InitiatingProcessCommandLine="",
+        InitiatingProcessAccountName=SenderMailFromAddress, ReportId=""
+    | extend SourceTable = "EmailEvents"
+)
+| sort by Timestamp desc
