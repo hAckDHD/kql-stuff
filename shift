@@ -1,0 +1,31 @@
+let GetOffset = (dt: datetime) {
+    let yr = getyear(dt);
+    // 2nd Sunday in March
+    let marchStart = datetime_add('day', 13 - dayofweek(make_datetime(yr,3,1)) / 1d, make_datetime(yr,3,1));
+    // 1st Sunday in November
+    let novStart = datetime_add('day', 6 - dayofweek(make_datetime(yr,11,1)) / 1d, make_datetime(yr,11,1));
+    case(
+        dt >= marchStart and dt < novStart, -5h,  // CDT
+        -6h                                       // CST
+    )
+};
+//
+AlertInfo
+| extend Offset = GetOffset(Timestamp)
+| extend LocalTime = Timestamp + Offset
+| extend Shift = case(
+    hourofday(LocalTime) < 8, "3rd Shift (0000-0800)",
+    hourofday(LocalTime) < 16.5, "1st Shift (0800-1630)",
+    "2nd Shift (1630-0000)"
+  )
+| project
+    TimeGenerated = LocalTime,
+    AlertId,
+    Title,
+    Severity,
+    Status = "Active",
+    AssignedTo = "",
+    LastUpdate = LocalTime,
+    Shift,
+    Notes = ""
+| order by TimeGenerated desc
